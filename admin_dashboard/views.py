@@ -1,5 +1,7 @@
 from django.shortcuts import render
 
+def admin_home(request):
+    return render(request,"admin_dashboard/index.html",{})
 def admin_profile(request):
     return render(request, "admin_dashboard/profile.html",{})
 def admin_masterlist(request):
