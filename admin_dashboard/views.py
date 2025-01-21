@@ -513,11 +513,18 @@ def search_students(request):
 
         template = get_template('admin_dashboard/search_results.html')
 
-        search_results = student.objects.filter(year=search_year).values() | student.objects.filter(course=search_course) | student.objects.filter(studentnumber=search_student_id).values()
-        
+        students = student.objects.all()
+
+        if search_year:
+            students = students.filter(year=search_year)
+        if search_course:
+            students = students.filter(course__name__icontains=search_course)
+        if search_student_id:
+            students = students.filter(studentnumber__icontains=search_student_id)
+
         context = {
-        'allstudents': allstudents,
-        'search_results': search_results
+        'allstudents': student.objects.all(),
+        'search_results': students,
         }
 
         return HttpResponse(template.render(context, request))
