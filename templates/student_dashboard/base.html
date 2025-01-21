@@ -41,13 +41,7 @@
                       </a>
                   </li>
                   <li class="sidebar-item">
-                    <a href="{% url 'student-status' %}" class="sidebar-link">
-                        <i class="fas fa-info-circle pe-2"></i>
-                        Enrollment Status
-                    </a>
-                </li>
-                  <li class="sidebar-item">
-                      <a href="{% url 'student-cor' %}" class="sidebar-link">
+                      <a href="{% url 'student-checklist' %}" class="sidebar-link">
                           <i class="fas fa-file-alt pe-2"></i>
                           View COR
                       </a>
@@ -70,7 +64,6 @@
                             </a>
                             <div class="dropdown-menu dropdown-menu-end">
                                 <a href="{% url 'student-profile' %}" class="dropdown-item">Profile</a>
-                                <a href="#" class="dropdown-item">Setting</a>
                                 <form action="{% url 'logout' %}" method="post">
                                     {% csrf_token %}
                                     <button type="submit" class="dropdown-item">Logout</button>

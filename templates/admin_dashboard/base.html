@@ -98,6 +98,7 @@
                             <div class="dropdown-menu dropdown-menu-end">
                                 <a href="{% url 'admin-dashboard-profile' %}" class="dropdown-item">Profile</a>
                                 <a href="{% url 'admin_config' %}" class="dropdown-item">Configuration</a>
+                                <a href="{% url 'set_enrollment_date_view' %}" class="dropdown-item">Set Enrollment Dates</a>
                                 <a href="{% url 'adjust_fees' %}" class="dropdown-item">Adjust fees</a>
                                 <form action="{% url 'logout' %}" method="post">
                                     {% csrf_token %}

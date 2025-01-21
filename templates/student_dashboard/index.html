@@ -4,44 +4,98 @@
 
 {% block content %}
 <div class="container-fluid">
-  <div class="mb-3">
-    <h4>Student Dashboard</h4>
-</div>
-<div class="row">
-    <div class="col-12 col-md-6 d-flex">
-        <div class="card flex-fill border-0 illustration">
-            <div class="card-body p-0 d-flex flex-fill">
-                <div class="row g-0 w-100">
-                    <div class="col-6">
-                        <div class="p-3 m-1">
-                            <h4>Welcome Back, {{ user.first_name }}!</h4>
-                            <p class="mb-0">{{ student.course }}</p>
-                            <p class="mb-0">{{ student.year }}</p>
+    <div class="mb-3">
+        <h4>Student Dashboard</h4>
+    </div>
+    <div class="row">
+        <div class="col-12 col-md-6 d-flex">
+            <div class="card flex-fill border-0 illustration">
+                <div class="card-body p-0 d-flex flex-fill">
+                    <div class="row g-0 w-100">
+                        <div class="col-12">
+                            <div class="p-3 m-1">
+                                <h4>Welcome Back, {{ user.first_name }}!</h4>
+                                <p class="mb-0">{{ student.course }}</p>
+                                <p class="mb-0">{{ student.year }}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-12 col-md-6 d-flex">
-        <div class="card flex-fill border-0">
-            <div class="card-body py-4">
-                <div class="d-flex align-items-start">
-                    <div class="flex-grow-1">
-                        <h4 class="mb-2">
-                            7
-                        </h4>
-                        <p class="mb-2">
-                            Total Subjects
-                        </p>
-                        <div class="mb-0">
-                            <span class="badge text-success me-2">
-                                Enrolled for
-                            </span>
-                            <span class="text-muted">
-                               Academic Year 2024-2025
-                            </span>
+        <div class="col-12 col-md-6 d-flex">
+            <div class="card flex-fill border-0">
+                <div class="card-body py-4">
+                    <div class="d-flex align-items-start">
+                        <div class="flex-grow-1">
+                            <h4 class="mb-2">
+                                {{pending_subjects_count}}
+                            </h4>
+                            <p class="mb-2">
+                                Current Enrolled Subjects
+                            </p>
+                            <div class="mb-0">
+                                <span class="badge text-success me-2">
+                                    Passed 
+                                </span>
+                                <span class="text-muted">
+                                    {{passed_subjects_count}} total subjects
+                                </span>
+                            </div>
                         </div>
-    
+                    </div>
+                </div>
+            </div>
+        </div>
+        
     </div>
+    <div class="card border-0">
+        <div class="card-header">
+            <h5 class="card-title">
+                Students Table
+            </h5>
+            <h6 class="card-subtitle text-muted">
+                This table provides an overview of your enrolled subjects this semester.
+            </h6>                            
+        </div>
+        <div class="card-body">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">Course Code</th>
+                        <th scope="col">Course Title</th>
+                        <th scope="col">Prerequisite/s</th>
+                        <th scope="col">Status</th>
+                        <th scope="col">Instructor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if pending_subjects %}
+                        {% for entry in pending_subjects %}
+                            <tr>
+                                <td>{{ entry.subject.course_code }}</td>
+                                <td>{{ entry.subject.course_title }}</td>
+                                <td title="{% for prerequisite in entry.subject.prerequisite.all %}
+                                                {{ prerequisite.course_code }} - {{ prerequisite.course_title }}
+                                                {% if not forloop.last %}, {% endif %}
+                                            {% endfor %}">
+                                    {% for prerequisite in entry.subject.prerequisite.all %}
+                                        {{ prerequisite.course_code }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                </td>
+                                <td>{{ entry.status }}</td>
+                                <td>{{ entry.instructor.name|default:"TBD" }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="table-danger">No subjects with Pending status.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+                
+            </table>
+        </div>
+    </div>
+</div>
 {% endblock %}

@@ -1,6 +1,6 @@
 from django.shortcuts import render , redirect, get_object_or_404
 from django.http import HttpResponse,JsonResponse, HttpResponseRedirect
-from .models import student, Subject, Instructor, Program, Checklist, ChecklistItem, school_fees
+from .models import student, Subject, Instructor, Program, Checklist, ChecklistItem, school_fees, enrollment_dates
 from .cor import generate_cor
 from django.template.loader import get_template
 # from xhtml2pdf import pisa
@@ -152,7 +152,21 @@ def generateUniqueUsername(first_name, last_name):
 
     return username
 def admin_enrollment(request):
-    return render(request, "admin_dashboard/new_or_old_enrollee.html",{})
+    starting_date = enrollment_dates.objects.get(enrollment_period="starting_enrollment_date")
+    ending_date = enrollment_dates.objects.get(enrollment_period="ending_enrollment_date")
+
+    day_now = datetime.now().day
+    month_now = datetime.now().month
+    year_now = datetime.now().year
+
+    ending_enrollment_date = datetime(ending_date.year, ending_date.month, ending_date.day)
+    starting_enrollment_date = datetime(starting_date.year, starting_date.month, starting_date.day)
+    date_today = datetime(year_now, month_now, day_now)
+
+    if date_today >= starting_enrollment_date and date_today <= ending_enrollment_date:
+        return render(request, "admin_dashboard/new_or_old_enrollee.html",{})
+    else:
+        return render(request, "admin_dashboard/enrollment_period_notification.html",{})
 def enroll_student(request, enrollee_type):
     if request.method == 'POST':
         student_number = None
@@ -534,6 +548,51 @@ def delete_instructor(request, instructor_id):
         return redirect('admin_config')
     else:
         return redirect('admin_config')
+
+def set_enrollment_date_view(request):
+
+    template = get_template('admin_dashboard/set_enrollment_date.html')
+
+    starting_enrollment_date = enrollment_dates.objects.get(enrollment_period="starting_enrollment_date")
+    ending_enrollment_date = enrollment_dates.objects.get(enrollment_period="ending_enrollment_date")
+
+    context = {
+
+        'starting_year': starting_enrollment_date.year,
+        'starting_month': starting_enrollment_date.month,
+        'starting_day': starting_enrollment_date.day,
+        'ending_year': ending_enrollment_date.year,
+        'ending_month': ending_enrollment_date.month,
+        'ending_day': ending_enrollment_date.day,
+
+    }
+
+    return HttpResponse(template.render(context, request))
+
+
+def set_enrollment_date(request):
+
+    template = get_template('admin_dashboard/notification_set_enrollment_dates.html')
+
+    get_starting_month = request.POST.get('starting_month')
+    get_starting_day = request.POST.get('starting_day')
+    get_starting_year= request.POST.get('starting_year')
+
+    get_ending_month = request.POST.get('ending_month')
+    get_ending_day = request.POST.get('ending_day')
+    get_ending_year = request.POST.get('ending_year')
+
+    enrollment_dates.objects.filter(enrollment_period='starting_enrollment_date').update(year=get_starting_year)
+    enrollment_dates.objects.filter(enrollment_period='starting_enrollment_date').update(day=get_starting_day)
+    enrollment_dates.objects.filter(enrollment_period='starting_enrollment_date').update(month=get_starting_month)
+
+    enrollment_dates.objects.filter(enrollment_period='ending_enrollment_date').update(year=get_ending_year)
+    enrollment_dates.objects.filter(enrollment_period='ending_enrollment_date').update(day=get_ending_day)
+    enrollment_dates.objects.filter(enrollment_period='ending_enrollment_date').update(month=get_ending_month)
+
+    context = {}
+
+    return HttpResponse(template.render(context, request))
 
 #---------------------FEES SETTINGS-----------------------------------
 def adjust_fees(request):
