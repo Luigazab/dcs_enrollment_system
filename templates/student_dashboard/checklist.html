@@ -1,0 +1,127 @@
+{% extends 'student_dashboard/base.html' %}
+
+{% block title %}Student Dashboard{% endblock %}
+{% block css %}
+<style>
+    /* Apply consistent styling to all tables */
+    .table-style {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 0;
+        text-align: left;
+    }
+
+
+    /* Style for table rows and cells */
+    .table-style td {
+        padding: 12px;
+    }
+
+    /* Ensure uniform column sizes */
+    .table-style th,
+    .table-style td {
+        text-align: justify;
+        vertical-align: middle;
+    }
+    .table-style th {
+        text-align: center;
+    }
+
+    .table-style {
+        table-layout: fixed;
+    }
+    td[title] {
+        position: relative;
+        cursor: help;
+    }
+
+    td[title]:hover {
+        text-decoration: underline;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Student Checklist</h4>
+    </div>
+    <div class="mb-3">
+        <div>
+            <label class="fw-bold">Student ID:</label>
+            <span>{{student.studentnumber}}</span>
+        </div>
+        <div>
+            <label class="fw-bold">Student Name:</label>
+            <span>{{student.lastname}}, {{student.firstname}} {{student.middlename|slice:"1" }} {{student.suffix|default:""}}</span>
+        </div>
+        <div>
+            <label class="fw-bold">Year Level:</label>
+            <span>{{student.year}}</span>
+        </div>
+        <div>
+            <label class="fw-bold">Course & Section:</label>
+            <span>{{student.course.name}} {{student.sectionyear}}-{{student.section}}</span>
+        </div>
+    </div>
+    
+    <div class="mb-3">
+        <form method="POST">
+            {% csrf_token %}
+            <div class="input-group">
+                <input type="text" name="search_query" class="form-control" placeholder="Search...">
+                <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
+            </div>
+        </form>
+        {% if search_query %}
+            <p>Search results for: "{{ search_query }}"</p>
+        {% endif %}
+        {% for semester, subjects in year_semester_subjects.items %}
+        <div>
+            <!-- First Year - First Semester -->
+            <h5 class="mt-4">{{ semester }}</h4>
+            <table class="table table-bordered table-style">
+                <thead class="table-secondary">
+                    <tr>
+                        <th>Course Code</th>
+                        <th style="width: 38%;">Course Title</th>
+                        <th>Prerequisite/s</th>
+                        <th>Grade</th>
+                        <th>Status</th>
+                        <th style="width: 23%;">Instructor</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for entry in subjects %}
+                        <tr>
+                            {% if entry.subject %}
+                            <td>{{ entry.subject.course_code }}</td>
+                            <td>{{ entry.subject.course_title }}</td>
+                            <td title="{% if entry.subject.prerequisite.all %}
+                                        {% for prerequisites in entry.subject.prerequisite.all %}
+                                            {{ prerequisites.course_code }} - {{ prerequisites.course_title }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %}
+                                    {% endif %}">
+                                {% if entry.subject.prerequisite.all %}
+                                    {% for prerequisites in entry.subject.prerequisite.all %}
+                                        {{ prerequisites.course_code }}{% if not forloop.last %}, {% endif %}
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>{{ entry.grade|default:"-" }}</td>
+                            <td>{{ entry.status }}</td>
+                            <td>{{ entry.instructor.name|default:"" }}</td>
+                            {% else %}
+                                <td colspan="6" class="table-danger">No subjects match for this semester</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+    
+{% endblock %}

@@ -3,7 +3,7 @@ from django.http import HttpResponse,JsonResponse, HttpResponseRedirect
 from .models import student, Subject, Instructor, Program, Checklist, ChecklistItem, school_fees
 from .cor import generate_cor
 from django.template.loader import get_template
-from xhtml2pdf import pisa
+# from xhtml2pdf import pisa
 from datetime import datetime
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -13,6 +13,11 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.utils import IntegrityError
 from django.db.models import Sum, F, Avg
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth import update_session_auth_hash
+from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
+from django.contrib.contenttypes.models import ContentType
+from django.utils.timezone import localtime
 
 
 allstudents = student.objects.all()
@@ -26,8 +31,72 @@ def home(request):
 
     return render(request, 'admin_dashboard/index.html', context)
 
+@login_required
 def admin_profile(request):
-    return render(request, "admin_dashboard/profile.html",{})
+    user = request.user
+
+    if request.method == "POST":
+        # Fetch form data
+        username = request.POST.get("username")
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        email = request.POST.get("email")
+        new_password = request.POST.get("new_password")
+        confirm_new_password = request.POST.get("confirm_new_password")
+
+
+        # Update user fields
+        changes = []
+
+        if user.username != username:
+            changes.append("Changed username")
+            user.username = username
+
+        if user.first_name != first_name:
+            changes.append("Changed first name")
+            user.first_name = first_name
+
+        if user.last_name != last_name:
+            changes.append("Changed last name")
+            user.last_name = last_name
+
+        if user.email != email:
+            changes.append("Changed email")
+            user.email = email
+
+        # Handle password change
+        if new_password and confirm_new_password:
+            if new_password == confirm_new_password:
+                user.password = make_password(new_password)
+                changes.append("Changed password")
+                update_session_auth_hash(request, user)
+                messages.success(request, "Password updated successfully.")
+            else:
+                # Password mismatch error
+                messages.error(request, "Passwords do not match.")
+                return redirect("admin-dashboard-profile")
+
+        # Save changes
+        if changes:
+            user.save()
+
+            # Log the action
+            LogEntry.objects.log_action(
+                user_id=request.user.pk,
+                content_type_id=ContentType.objects.get_for_model(User).pk,
+                object_id=user.pk,
+                object_repr=str(user),
+                action_flag=CHANGE,
+                change_message=", ".join(changes)
+            )
+            messages.success(request, "Profile updated successfully.")
+        else:
+            messages.info(request, "No changes made.")
+        return redirect("admin-dashboard-profile")
+    
+    recent_activities = LogEntry.objects.filter(user=user).order_by('-action_time')[:10]
+    
+    return render(request, "admin_dashboard/profile.html",{"user": user, "recent_activities": recent_activities,})
 
 @login_required
 def create_admin(request):
