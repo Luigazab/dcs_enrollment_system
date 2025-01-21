@@ -30,12 +30,14 @@
                             <i class="fa-solid fa-list pe-2"></i> Dashboard
                         </a>
                     </li>
+                    {% if request.user.is_superuser %}
                     <li class="sidebar-item">
                         <div class="d-flex justify-content-between align-items-center">
                             <a href="{% url 'admin-dashboard-profile' %}" class="sidebar-link">
                                 <i class="fa-regular fa-user"></i>
                                 <span>&nbsp; Profile</span>
                             </a>
+                            
                             <button class="btn btn-link p-3 sidebar-toggle" data-bs-toggle="collapse" data-bs-target="#profile-dropdown" aria-expanded="false" aria-controls="profile-dropdown">
                                 <i class="fa-solid fa-chevron-down text-white" style="opacity: 0.6;"></i>
                             </button>
@@ -49,6 +51,13 @@
                             </li>
                         </ul>
                     </li>
+                    {% else %}
+                    <li class="sidebar-item">
+                        <a href="{% url 'admin-dashboard-profile' %}" class="sidebar-link">
+                            <i class="fa-regular fa-user"></i> Profile
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="sidebar-item">
                         <a href="{% url 'admin-dashboard-masterlist' %}" class="sidebar-link">
                             <i class="fa-solid fa-file-lines pe-2"></i> Masterlist
@@ -102,7 +111,9 @@
 
             <main class="content px-3 py-2">
                 {% block content %} {% endblock %}
-                {% block modal %} {% endblock %}
+                {% block modal %}
+                    {% include 'admin_dashboard/restricted_page.html' %}
+                {% endblock %}
             </main>
 
             <footer class="footer">

@@ -28,8 +28,46 @@ def home(request):
 
 def admin_profile(request):
     return render(request, "admin_dashboard/profile.html",{})
+
+@login_required
 def create_admin(request):
-    return render(request, "admin_dashboard/add-admin.html",{})
+    if not request.user.is_superuser:
+        return render(request, 'admin_dashboard/add-admin.html', {'show_modal': True})
+    else:
+        if request.method == 'POST':
+            fname = request.POST.get('adminFirst')
+            lname = request.POST.get('adminLast')
+            email = request.POST.get('adminEmail')
+            username = request.POST.get('adminUsername')
+            password = request.POST.get('adminPassword')
+            confirm_password = request.POST.get('confirmadminPassword')
+
+            if password != confirm_password:
+                messages.error(request, "Passwords do not match.")
+                return redirect('admin-create-new')
+
+            if User.objects.filter(username=username).exists():
+                messages.error(request, "Username already exists.")
+                return redirect('admin-create-new')
+
+            if User.objects.filter(email=email).exists():
+                messages.error(request, "Email already exists.")
+                return redirect('admin-create-new')
+            
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                password=password
+            )
+            user.first_name = fname
+            user.last_name = lname
+            user.is_staff = True  # Ensure the user is marked as staff
+            user.is_superuser = False  # Ensure the user is marked as staff
+            user.save()
+
+            messages.success(request, "Admin account created successfully.")
+            return redirect('admin-create-new')
+        return render(request, "admin_dashboard/add-admin.html",{})
 
 def admin_schedule(request):
     return render(request, "admin_dashboard/schedule.html",{})
