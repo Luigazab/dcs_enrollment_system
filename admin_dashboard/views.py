@@ -18,6 +18,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.utils.timezone import localtime
+from django.db.models import Q
 
 
 allstudents = student.objects.all()
@@ -138,8 +139,6 @@ def create_admin(request):
             return redirect('admin-create-new')
         return render(request, "admin_dashboard/add-admin.html",{})
 
-def admin_schedule(request):
-    return render(request, "admin_dashboard/schedule.html",{})
 
 #------------FOR CREATING NEW STUDENT ACCOUNT, BOTH OLD AND NEW---------------------------------
 def generateUniqueUsername(first_name, last_name):
@@ -276,35 +275,45 @@ def enroll_student(request, enrollee_type):
 #------------------CHECKLIST PAGE--SEARCH STUDENT--INPUT GRADES-----------------
 def admin_checklist(request):
     if request.method == 'POST':
-
         search_student_id = request.POST.get('student_number')
-        search_student = student.objects.get(studentnumber=search_student_id)
 
-        checklist_items =ChecklistItem.objects.filter(checklist__student=search_student.user)
-        all_subjects = Subject.objects.filter(program=search_student.course)
+        try:
+            # Attempt to find the student with the given student number
+            search_student = student.objects.get(studentnumber=search_student_id)
 
-        year_semester_subjects ={}
-        for year in range(1, 5):
-            for sem in [1, 2]:
-                subjects = all_subjects.filter(year=year, semester=sem)
-                enrolled = checklist_items.filter(subject__in=subjects)
+            checklist_items = ChecklistItem.objects.filter(checklist__student=search_student.user)
+            all_subjects = Subject.objects.filter(program=search_student.course)
 
-                enrolled_dict = {item.subject: item for item in enrolled}
+            year_semester_subjects = {}
+            for year in range(1, 5):
+                for sem in [1, 2]:
+                    subjects = all_subjects.filter(year=year, semester=sem)
+                    enrolled = checklist_items.filter(subject__in=subjects)
 
-                year_semester_subjects[f"Year {year} - Semester {sem}"] = [
-                    {"subject": subj, "status": "Not Enrolled"} if subj not in enrolled_dict
-                    else {"subject": subj, "status": enrolled_dict[subj].status, "grade": enrolled_dict[subj].grade, "instructor": enrolled_dict[subj].instructor}
-                    for subj in subjects
-                ]
+                    enrolled_dict = {item.subject: item for item in enrolled}
 
-        context = {
-            'student': student.objects.get(studentnumber=search_student_id),
-            'year_semester_subjects': year_semester_subjects,
-        }
+                    year_semester_subjects[f"Year {year} - Semester {sem}"] = [
+                        {"subject": subj, "status": "Not Enrolled"} if subj not in enrolled_dict
+                        else {"subject": subj, "status": enrolled_dict[subj].status, "grade": enrolled_dict[subj].grade, "instructor": enrolled_dict[subj].instructor}
+                        for subj in subjects
+                    ]
 
-        return render(request, "admin_dashboard/checklist.html", context)
+            context = {
+                'student': search_student,
+                'year_semester_subjects': year_semester_subjects,
+            }
+
+            return render(request, "admin_dashboard/checklist.html", context)
+
+        except student.DoesNotExist:
+            # Return a message if no student is found
+            error_message = f"No student found with the number {search_student_id}."
+            return render(request, "admin_dashboard/checklist.html", {
+                'error_message': error_message,
+                'student': None,
+            })
     else:
-        return render(request, "admin_dashboard/checklist.html", {'student':None})
+        return render(request, "admin_dashboard/checklist.html", {'student': None})
 def grades_input(student_number):
     enrolled_student =student.objects.get(studentnumber=student_number)
     current_year = datetime.now().year
@@ -315,7 +324,6 @@ def grades_input(student_number):
     checklist_items = ChecklistItem.objects.filter(
         checklist__student=enrolled_student.user, status="Pending"
     )
-    gpa = calculate_gpa(checklist_items)
     total_subjects = checklist_items.count()
     total_units = checklist_items.aggregate(
         total_units=Sum(F("subject__subject_units_lec") + F("subject__subject_units_lab"))
@@ -328,32 +336,28 @@ def grades_input(student_number):
         'checklist_items': checklist_items,
         'total_subjects': total_subjects,
         'total_units': total_units,
-        'gpa': gpa,
         'user': enrolled_student.user,
         'date': datetime.now(),
     }
-def calculate_gpa(checklist_items):
-    graded_items = checklist_items.filter(grade__isnull=False)
-    gpa = graded_items.aggregate(average=Avg('grade'))["average"]
-    return round(gpa, 2) if gpa else "N/A"
+
 def grades_input_view(request, student_number):
     data = grades_input(student_number)
 
     if request.method == "POST":
-        # Handle form submission for grades and instructor assignments
         grades = request.POST.getlist('grades[]')
         instructor_ids = request.POST.getlist('instructors[]')
+        selected_school_year = request.POST.get("schoolyear")
 
         errors = []
         valid_grades = []
         checklist_items = data["checklist_items"]
 
+        if not selected_school_year:
+            errors.append("Please select a school year.")
+        
         if len(grades) != len(checklist_items) or len(instructor_ids) != len(checklist_items):
             errors.append("The number of grades or instructors does not match the number of checklist items.")
-            data["errors"] = errors
-            return render(request, 'admin_dashboard/grades_input.html', data)
 
-        # Validate grades
         for index, grade in enumerate(grades):
             try:
                 grade = float(grade)
@@ -365,10 +369,10 @@ def grades_input_view(request, student_number):
                 errors.append(f"Grade at row {index + 1} is not a valid number.")
 
         if errors:
-            data["errors"] = errors
+            for error in errors:
+                messages.error(request, error)
             return render(request, 'admin_dashboard/grades_input.html', data)
 
-        # If all grades are valid, save them
         for index, grade in valid_grades:
             checklist_item = checklist_items[index]
             checklist_item.grade = grade
@@ -379,75 +383,24 @@ def grades_input_view(request, student_number):
                 checklist_item.instructor = Instructor.objects.get(id=instructor_id)
 
             checklist_item.save()
-
-        # After saving, generate the COG and return as a PDF
+        gpa = round(sum(grade for _, grade in valid_grades) / len(valid_grades), 2)
         context = {
             "student": data["student"],
             "checklist_items": data["checklist_items"],
             "grades": [item.grade for item in data["checklist_items"]],
             "instructors": data["instructors"],
             "total_units": data["total_units"],
-            "gpa": data['gpa'],
+            "gpa": gpa,
+            "school_year": selected_school_year,
             "date": data["date"],
+            "user": request.user,
         }
 
-        # Generate and return the COG as a PDF
         pdf = generate_cor('admin_dashboard/cog_template.html', context)
         return HttpResponse(pdf, content_type='application/pdf')
 
     return render(request, 'admin_dashboard/grades_input.html', data)
-# def print_cog(request, student_number):
-#     data = grades_input(student_number)
-
-#     if request.method == "POST":
-#         # Handle form submission for grades and instructor assignments
-#         grades = request.POST.getlist('grades[]')
-#         instructor_ids = request.POST.getlist('instructors[]')
-
-#         errors = []
-#         valid_grades = []
-#         checklist_items = data["checklist_items"]
-
-#         # Validate grades
-#         for index, grade in enumerate(grades):
-#             try:
-#                 grade = float(grade)
-#                 if 1 <= grade <= 5:
-#                     valid_grades.append((index, grade))
-#                 else:
-#                     errors.append(f"Grade at row {index + 1} must be between 1 and 5.")
-#             except ValueError:
-#                 errors.append(f"Grade at row {index + 1} is not a valid number.")
-
-#         if errors:
-#             data["errors"] = errors
-#             return render(request, 'admin_dashboard/grades_input.html', data)
-
-#         # If all grades are valid, save them
-#         for index, grade in valid_grades:
-#             checklist_item = checklist_items[index]
-#             checklist_item.grade = grade
-#             checklist_item.status = "PASSED" if 1 <= grade <= 4 else "FAILED"
-
-#             instructor_id = instructor_ids[index]
-#             if instructor_id:
-#                 checklist_item.instructor = Instructor.objects.get(id=instructor_id)
-
-#             checklist_item.save()
-
-#         context = {
-#             "student": data["student"],
-#             "checklist_items": data["checklist_items"],
-#             "grades": [item.grade for item in data["checklist_items"]],
-#             "instructors": data["instructors"],
-#             "total_units": data["total_units"],
-#             "gpa": data['gpa'],
-#             "date": data["date"],
-#         }
-#         pdf = generate_cor('admin_dashboard/cog_template.html', context)
-#         return HttpResponse(pdf, content_type='application/pdf')
-#     return redirect('grades_input_view', student_number=student_number)
-        
+    
 
 
 #-------------COONFIGURATION PAGE--SUBJECT---INSTRUCTOR------------------
@@ -766,14 +719,26 @@ def process_cor(request, student_number):
 
     template = get_template('admin_dashboard/process_cor.html')
     enrolled_student = student.objects.get(studentnumber=student_number)
-    subject_code = Subject.objects.filter(program=enrolled_student.course).order_by('year', 'semester', 'course_code')
+    all_subjects = Subject.objects.filter(program=enrolled_student.course)
+    
+    # Get the student's checklist items
+    checklist_items = ChecklistItem.objects.filter(checklist__student=enrolled_student.user)
+
+    # Filter subjects: not passed and prerequisites satisfied
+    available_subjects = all_subjects.exclude(
+        id__in=checklist_items.filter(status="Passed").values_list('subject_id', flat=True)
+    ).filter(
+        Q(prerequisite=None) |
+        Q(prerequisite__in=checklist_items.filter(status="Passed").values_list('subject_id', flat=True))
+    ).order_by('year', 'semester', 'course_code')
+
     current_school_year = datetime.now().year
     previous_school_year = datetime.now().year - 1
     next_school_year = datetime.now().year + 1
 
     context = {
         'enrolled_student': enrolled_student,
-        'subject_codes':subject_code,
+        'subject_codes': available_subjects,
         'current_SY':current_school_year,
         'previous_SY':previous_school_year,
         'next_SY':next_school_year,

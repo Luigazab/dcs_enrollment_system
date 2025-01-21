@@ -41,6 +41,7 @@
       <div class="col-md-6">
         <p><strong>Academic Year:</strong> 
           <select class="form-select d-inline"style="width:30%;" name="schoolyear">
+            <option value="" selected disabled>Choose a school year</option>
             {% for year in academic_years %}
               <option value="{{ year }}">{{ year }}</option>
             {% endfor %}
