@@ -5,7 +5,13 @@
 {% block content %}
 <div class="container-fluid">
     <div class="mb-3">
-        <h4>Enroll a New Student</h4>
+        <h4>
+            {% if enrollee_type == 'old' %}
+            Enroll Old Student
+            {% else %}
+            Enroll New Student
+            {%endif%}
+        </h4>
         <div>
             <!-- Student Enrollment Form -->
             <!-- Personal Information -->
